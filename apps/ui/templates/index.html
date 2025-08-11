@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Tramita Ya — Autodocs Enterprise</title>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/designer.css" /></head>
+<body class="bg-gray-900 text-gray-100">
+<header class="bg-gradient-to-r from-sky-500 to-sky-700 p-4 shadow"><div class="max-w-6xl mx-auto flex items-center justify-between">
+  <div class="font-extrabold">Tramita Ya</div><nav class="space-x-4"><a class="hover:underline" href="/ui/designer">Diseñador</a><a class="hover:underline" href="/ui/history">Historial</a><a class="hover:underline" href="/ui/login">Login</a></nav>
+</div></header>
+<main class="max-w-6xl mx-auto p-6"><h1 class="text-2xl font-bold">Bienvenido</h1>
+<p class="text-gray-300">Crea y gestiona documentos como en DocsAutomator, con presets y validación en vivo.</p><div class="mt-4 text-sm text-gray-300">Demo: <button class="bg-sky-600 hover:bg-sky-700 px-3 py-1 rounded" onclick="seedDemo()">Sembrar plantilla de ejemplo</button></div>
+</main>
+<script>async function seedDemo(){const r=await fetch('/v1/demo/seed',{method:'POST'});const j=await r.json();alert('Plantilla creada: '+j.template_key+' (form '+j.form_id+')');}</script>
+</body></html>

@@ -1,0 +1,79 @@
+{
+  "info": {
+    "name": "Autodocs Enterprise",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/healthz"
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@tramita-ya.com\",\"password\":\"<tu_clave>\"}"
+        },
+        "url": "{{base_url}}/auth/login"
+      }
+    },
+    {
+      "name": "Presets",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/v1/presets"
+      }
+    },
+    {
+      "name": "History recent",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{base_url}}/v1/history/recent"
+      }
+    },
+    {
+      "name": "External generate",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"data\":{\"NOMBRES\":\"ANA\",\"DNI\":\"12345678\"},\"options\":{\"format\":\"both\"}}"
+        },
+        "url": "{{base_url}}/v1/external/generate/poder_amplio"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    }
+  ]
+}

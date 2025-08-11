@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  api:
+    build: { context: .., dockerfile: infra/docker/api.Dockerfile }
+    env_file: [ ../.env ]
+    environment: [ PYTHONUNBUFFERED=1 ]
+    ports: [ "8000:8000" ]
+    depends_on: [ db, redis ]
+    volumes:
+      - ../apps/ui/templates:/app/apps/ui/templates:ro
+      - ../apps/ui/static:/app/apps/ui/static:ro
+  worker:
+    build: { context: .., dockerfile: infra/docker/worker.Dockerfile }
+    env_file: [ ../.env ]
+    depends_on: [ db, redis ]
+  db:
+    image: postgres:16
+    environment: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: autodocs }
+    ports: [ "5433:5432" ]
+    volumes: [ "pgdata:/var/lib/postgresql/data" ]
+  redis:
+    image: redis:7
+    ports: [ "6379:6379" ]
+volumes: { pgdata: {} }

@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Historial</title>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head>
+<body class="bg-gray-900 text-gray-100">
+<header class="bg-gradient-to-r from-sky-500 to-sky-700 p-4 shadow">
+  <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <div class="font-extrabold tracking-wide">Tramita Ya</div>
+    <nav class="space-x-4"><a class="hover:underline" href="/ui">Inicio</a></nav>
+  </div>
+</header>
+<main class="max-w-6xl mx-auto p-6">
+  <h1 class="text-2xl font-bold mb-3">Historial de documentos</h1>
+  <div class="flex gap-2 mb-4 items-end">
+    <div><label class="block text-xs text-gray-400">Estado</label>
+      <select id="status" class="bg-gray-800 border border-gray-700 p-2 rounded">
+        <option value="">(todos)</option><option>queued</option><option>done</option><option>error</option>
+      </select>
+    </div>
+    <div><label class="block text-xs text-gray-400">ID desde</label><input id="start_id" class="bg-gray-800 border border-gray-700 p-2 rounded w-32"></div>
+    <div><label class="block text-xs text-gray-400">ID hasta</label><input id="end_id" class="bg-gray-800 border border-gray-700 p-2 rounded w-32"></div>
+    <button class="bg-sky-600 hover:bg-sky-700 px-3 py-2 rounded" onclick="load()">Filtrar</button>
+  </div>
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-gray-300"><th>ID</th><th>Estado</th><th>Plantilla</th><th>Fecha</th><th>Descargas</th></tr></thead>
+    <tbody id="rows" class="text-gray-200"></tbody>
+  </table>
+</main>
+<script>
+async function load(){
+  const status = document.getElementById('status').value;
+  const start_id = document.getElementById('start_id').value;
+  const end_id = document.getElementById('end_id').value;
+  const qs = new URLSearchParams(); if(status) qs.set('status',status); if(start_id) qs.set('start_id',start_id); if(end_id) qs.set('end_id',end_id);
+  const r = await fetch('/v1/history/search?'+qs.toString());
+  const j = await r.json();
+  const rows = document.getElementById('rows'); rows.innerHTML='';
+  j.forEach(x=>{
+    const tr = document.createElement('tr');
+    const links = [x.docx?`<a class="underline text-sky-400" href="${x.docx}" target="_blank">DOCX</a>`:'', x.pdf?`<a class="underline text-sky-400 ml-2" href="${x.pdf}" target="_blank">PDF</a>`:''].join('');
+    tr.innerHTML = `<td class="py-1">${x.id}</td><td>${x.status}</td><td>${x.template_id}</td><td>${x.created_at}</td><td>${links}</td>`;
+    rows.appendChild(tr);
+  });
+}
+document.addEventListener('DOMContentLoaded', load);
+</script>
+</body></html>

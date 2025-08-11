@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Diseñador — Tramita Ya</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/designer.css" />
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100">
+<header class="bg-gradient-to-r from-sky-500 to-sky-700 p-4 shadow">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <div class="font-extrabold tracking-wide">Tramita Ya</div>
+    <nav class="space-x-4"><a class="hover:underline" href="/ui">Inicio</a></nav>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-4">
+  <!-- Template upload -->
+  <section class="col-span-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
+    <h2 class="text-lg font-semibold">1) Plantilla</h2>
+    <input id="tpl" type="file" accept=".doc,.docx" class="w-full text-sm bg-gray-900 border border-gray-700 p-2 rounded mb-2" />
+    <input id="tpl_key" class="w-full text-sm bg-gray-900 border border-gray-700 p-2 rounded mb-2" placeholder="Clave (p.ej. poder_amplio)" />
+    <input id="tpl_name" class="w-full text-sm bg-gray-900 border border-gray-700 p-2 rounded mb-3" placeholder="Nombre legible" />
+    <button class="btn w-full" onclick="uploadTemplate()">Subir y detectar variables</button>
+    <div id="vars" class="mt-2 text-xs text-gray-300"></div>
+  </section>
+
+  <!-- Presets Perú -->
+  <section class="col-span-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
+    <h2 class="text-lg font-semibold">2) Presets Perú</h2>
+    <div id="presets" class="mt-2 text-sm"></div>
+  </section>
+
+  <!-- Form designer with validation -->
+  <section class="col-span-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
+    <h2 class="text-lg font-semibold">3) Formulario</h2>
+    <div class="text-gray-400 text-sm mb-2">Arrastra para ordenar. Edita para reglas y máscaras.</div>
+    <ul id="form-list" class="space-y-2"></ul>
+    <div class="mt-3 flex gap-2"><button class="btn" onclick="saveForm()">Guardar</button><button class="btn-outline" onclick="addField()">Añadir</button></div>
+  </section>
+
+  <!-- Preview & Generate -->
+  <section class="col-span-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
+    <h2 class="text-lg font-semibold">4) Previsualizar/Generar</h2>
+    <textarea id="preview-data" class="w-full h-40 bg-gray-900 border border-gray-700 p-2 rounded text-sm" placeholder='{"NOMBRES":"ANA","DNI":"12345678"}'></textarea>
+    <div class="mt-3 flex gap-2"><button class="btn" onclick="previewDoc()">DOCX Preview</button><button class="btn-outline" onclick="enqueueJob()">Generar (PDF/ODT/HTML)</button></div>
+    <div class="text-xs text-gray-400 mt-2">Consejo: usa el filtro Jinja <code>|pad(60,'=')</code> para llenar líneas con <code>=</code> al ancho fijo.</div>
+    <div id="status" class="text-sm text-gray-300 mt-3"></div>
+  </section>
+
+  <!-- Blocks (texto, tabla, firma, sello) - HTML editor simple -->
+  <section class="col-span-12 bg-gray-800 rounded-xl p-4 border border-gray-700">
+    <h2 class="text-lg font-semibold mb-2">Editor visual (bloques)</h2>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="col-span-2">
+        <div class="space-y-2">
+          <button class="btn w-full" onclick="addBlock('text')">Texto</button>
+          <button class="btn w-full" onclick="addBlock('table')">Tabla</button>
+          <button class="btn w-full" onclick="addBlock('signature')">Firma</button>
+          <button class="btn w-full" onclick="addBlock('stamp')">Sello</button>
+        </div>
+      </div>
+      <div class="col-span-10">
+        <div id="canvas" class="bg-gray-900 border border-gray-700 rounded p-3 min-h-[200px]" contenteditable="true"></div>
+        <div class="mt-2 flex gap-2">
+          <button class="btn" onclick="downloadCanvasDocx()">Guardar como DOCX</button>
+          <span class="text-xs text-gray-400">Arrastra y suelta bloques, edita texto y variables <code>{{ '{' }{'{ VAR }'} }</code>.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+let CURRENT_TEMPLATE_KEY = null; let CURRENT_FORM_ID = null; let formSchema = { fields: [] };
+
+function el(tag, cls){ const e = document.createElement(tag); if(cls) e.className = cls; return e; }
+
+function renderForm(){
+  const ul = document.getElementById('form-list'); ul.innerHTML = '';
+  formSchema.fields.forEach((f, idx) => {
+    const li = el('li', 'bg-gray-900 border border-gray-700 rounded p-2');
+    const top = el('div','flex items-center justify-between');
+    const title = el('div'); title.innerHTML = `<div class="font-semibold">${f.label}</div>
+      <div class="text-xs text-gray-400">${f.name} • ${f.type}${f.required?' • *':''}${f.mask?(' • '+f.mask.hint):''}${f.show_if?' • cond':''}</div>`;
+    const actions = el('div','space-x-2');
+    const edit = el('button','btn-sm'); edit.textContent='Editar'; edit.onclick=()=>editField(idx);
+    const del = el('button','btn-sm-outline'); del.textContent='Eliminar'; del.onclick=()=>{formSchema.fields.splice(idx,1);renderForm();};
+    actions.append(edit, del); top.append(title, actions); li.append(top); ul.append(li);
+  });
+  new Sortable(ul,{animation:150,onEnd:(e)=>{const [m]=formSchema.fields.splice(e.oldIndex,1);formSchema.fields.splice(e.newIndex,0,m);renderForm();}});
+}
+
+function addField(){ formSchema.fields.push({name:'nuevo',label:'Nuevo',type:'text',required:false,options:[],mask:null,transform:null,show_if:null}); renderForm(); }
+
+function editField(i){
+  const f = formSchema.fields[i];
+  const name = prompt('Nombre (Jinja):', f.name) || f.name;
+  const label = prompt('Etiqueta:', f.label) || f.label;
+  const type = prompt('Tipo (text,number,date,select,textarea,email):', f.type) || f.type;
+  const required = confirm('¿Requerido?');
+  let options = f.options||[]; let mask = f.mask||null; let transform = f.transform||null; let show_if = f.show_if||null;
+  if(type==='select'){ const raw = prompt('Opciones (coma):', (options||[]).join(',')); options = raw? raw.split(',').map(x=>x.trim()) : options; }
+  if(confirm('¿Editar máscara (regex)?')){ const rx = prompt('Regex:', mask?mask.regex:''); const hint = prompt('Pista:', mask?mask.hint:''); mask = rx? {regex:rx,hint:hint||''} : null; }
+  if(confirm('¿Forzar mayúsculas?')){ transform='uppercase'; }
+  if(confirm('¿Regla condicional show_if (campo=valor)?')){ const s = prompt('campo=valor', show_if? (show_if.field+'='+show_if.equals) : ''); if(s){ const [field,equals]=s.split('='); show_if = {field,equals}; } }
+  formSchema.fields[i] = {name,label,type,required,options,mask,transform,show_if}; renderForm();
+}
+
+function validateData(data){
+  for(const f of formSchema.fields){
+    if(f.show_if && data[f.show_if.field] != f.show_if.equals){ continue; }
+    const v = data[f.name];
+    if(f.required && (v===undefined || v===null || v==='')) return `${f.label} es obligatorio`;
+    if(f.mask && v){ const re = new RegExp(f.mask.regex); if(!re.test(v)) return `Formato inválido en ${f.label}. ${f.mask.hint||''}`; }
+    if(f.type==='email' && v){ const re = /^[^@\s]+@[^@\s]+\.[^@\s]+$/; if(!re.test(v)) return `Correo inválido en ${f.label}`; }
+  }
+  return null;
+}
+
+async function uploadTemplate(){
+  const key = document.getElementById('tpl_key').value.trim();
+  const name = document.getElementById('tpl_name').value.trim();
+  const file = document.getElementById('tpl').files[0];
+  if(!key || !name || !file){ alert('Completa clave, nombre y archivo'); return; }
+  const fd = new FormData(); fd.append('key',key); fd.append('name',name); fd.append('file',file);
+  const r = await fetch('/v1/templates/autoform', { method:'POST', body: fd });
+  if(!r.ok){ alert('Error subiendo plantilla'); return; }
+  const j = await r.json(); CURRENT_TEMPLATE_KEY = key; CURRENT_FORM_ID = j.form.id; formSchema = j.form.schema; renderForm();
+  document.getElementById('vars').textContent = 'Variables detectadas: ' + (formSchema.fields.map(x=>x.name).join(', ')||'—');
+  loadPresets();
+}
+
+async function saveForm(){
+  if(!CURRENT_FORM_ID){ alert('No hay formulario.'); return; }
+  const r = await fetch('/v1/forms/'+CURRENT_FORM_ID, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({schema: formSchema}) });
+  document.getElementById('status').textContent = r.ok ? 'Formulario guardado.' : 'Error guardando.';
+}
+
+async function previewDoc(){
+  if(!CURRENT_TEMPLATE_KEY){ alert('Sube primero una plantilla.'); return; }
+  let data = {}; try{ data = JSON.parse(document.getElementById('preview-data').value||'{}'); }catch(e){ alert('JSON inválido'); return; }
+  // Apply transforms and conditionals client-side
+  for(const f of formSchema.fields){
+    if(f.transform==='uppercase' && data[f.name]) data[f.name] = (data[f.name]+'').toUpperCase();
+    if(f.show_if && data[f.show_if.field] != f.show_if.equals){ delete data[f.name]; }
+  }
+  const err = validateData(data); if(err){ alert(err); return; }
+  const r = await fetch('/v1/preview/'+CURRENT_TEMPLATE_KEY, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({data}) });
+  if(!r.ok){ alert('Error en previsualización'); return; }
+  const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=CURRENT_TEMPLATE_KEY+'_preview.docx'; a.click(); URL.revokeObjectURL(url);
+}
+
+async function enqueueJob(){
+  if(!CURRENT_TEMPLATE_KEY){ alert('Sube primero una plantilla.'); return; }
+  let data = {}; try{ data = JSON.parse(document.getElementById('preview-data').value||'{}'); }catch(e){ alert('JSON inválido'); return; }
+  for(const f of formSchema.fields){
+    if(f.transform==='uppercase' && data[f.name]) data[f.name] = (data[f.name]+'').toUpperCase();
+    if(f.show_if && data[f.show_if.field] != f.show_if.equals){ delete data[f.name]; }
+  }
+  const err = validateData(data); if(err){ alert(err); return; }
+  const opts = { format: "both" }; // DOCX + PDF/ODT/HTML
+  const r = await fetch('/v1/generate/'+CURRENT_TEMPLATE_KEY, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({data, options: opts}) });
+  const j = await r.json(); document.getElementById('status').textContent = 'Job '+j.id+' enviado. Ver /v1/jobs/'+j.id;
+}
+
+async function loadPresets(){
+  const r = await fetch('/v1/presets'); if(!r.ok) return;
+  const j = await r.json(); const wrap = document.getElementById('presets'); wrap.innerHTML='';
+  j.presets.forEach(group => {
+    const g = el('div'); g.className = 'mb-3';
+    const title = el('div','font-semibold mb-1'); title.textContent = group.group; g.appendChild(title);
+    const grid = el('div','grid grid-cols-2 gap-2');
+    group.items.forEach(it => {
+      const btn = el('button','btn-sm-outline'); btn.textContent = it.label;
+      btn.onclick = ()=>{ formSchema.fields.push(it); renderForm(); };
+      grid.appendChild(btn);
+    });
+    g.appendChild(grid); wrap.appendChild(g);
+  });
+}
+
+// Blocks editor
+function addBlock(type){
+  const canvas = document.getElementById('canvas');
+  if(type==='text'){
+    canvas.insertAdjacentHTML('beforeend','<p class="mb-2">Texto editable con {{ VARIABLE }} y líneas: {{ NOMBRE|pad(60,"=") }}</p>');
+  } else if(type==='table'){
+    canvas.insertAdjacentHTML('beforeend','<table class="w-full mb-2"><tr><th>Campo</th><th>Valor</th></tr><tr><td>Nombre</td><td>{{ NOMBRES }}</td></tr></table>');
+  } else if(type==='signature'){
+    canvas.insertAdjacentHTML('beforeend','<div class="mb-2"><div>Firma:</div><div style="border-bottom:1px solid #999; height:24px;"></div></div>');
+  } else if(type==='stamp'){
+    canvas.insertAdjacentHTML('beforeend','<div class="mb-2">[SELLO]</div>');
+  }
+}
+
+async function downloadCanvasDocx(){
+  const html = document.getElementById('canvas').innerHTML;
+  const r = await fetch('/save-html-to-docx', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({html}) });
+  const j = await r.json();
+  alert('Guardado en S3 con key: '+j.key);
+}
+</script>
+</body>
+</html>
