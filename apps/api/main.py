@@ -33,8 +33,10 @@ async def startup():
                 ph = bcrypt.hashpw(settings.admin_password.encode(), bcrypt.gensalt()).decode()
                 u = User(email=settings.admin_email, role=(settings.admin_role or 'admin'), active=True, password_hash=ph)
                 s.add(u); await s.commit()
-
-@app.get("/healthz") async def healthz(): return {"ok": True}
+@app.get("/healthz")
+async def healthz():
+    return {"ok": True}
+  
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 app.include_router(templates.router, prefix="/v1/templates", tags=["templates"])
 app.include_router(forms.router,    prefix="/v1/forms",    tags=["forms"])
